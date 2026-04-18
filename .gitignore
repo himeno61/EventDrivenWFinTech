@@ -1,0 +1,47 @@
+# Editor
+.idea/
+.vscode/
+*.iml
+*.iws
+*.eml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Version control
+.svn
+
+# Logs & temp
+log/*.log
+*.log
+npm-debug.log*
+tmp/**
+out/
+
+# Dependencies
+node_modules/
+
+# Build
+dist/
+react/dist
+react/demo/dist
+.sass-cache
+.cache/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Presentation exports
+presentation
+presentation.zip
+*.zip
+
+# Dev
+dev.html
+coverage/
+
+# Claude
+.claude/

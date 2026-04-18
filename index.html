@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+		/>
+
+		<title>Presentation</title>
+
+		<link rel="stylesheet" href="dist/reset.css" />
+		<link rel="stylesheet" href="dist/reveal.css" />
+		<link rel="stylesheet" href="dist/theme/white.css" />
+		<link rel="stylesheet" href="style.css" />
+
+		<!-- Theme used for syntax highlighted code -->
+		<link rel="stylesheet" href="dist/plugin/highlight/monokai.css" />
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section>
+					<h1>Event-driven architecture w FinTechu</h1>
+					<p>Łukasz Binkiewicz</p>
+				<aside class="notes">
+					<p>Witajcie. Dzisiaj opowiem o Event-driven architecture w kontekście fin-techu — o projektowaniu systemów, gdzie stawką są cudze pieniądze.</p>
+					<p>Przez 40 minut przejdziemy przez: co to jest EDA, dlaczego w finansach to szczególnie ważne, jak wygląda realny system oparty na BACS, i jakie pułapki na Was czekają.</p>
+					<p>Zacznijmy od pytania — kto z Was kiedyś wysyłał przelew bankowy?</p>
+				</aside>
+				</section>
+				<section>
+					<img src="img/transfer.png" />
+				<aside class="notes">
+					<p>Patrzcie na to. Przelew bankowy. Kilka cyfr, jedno kliknięcie.</p>
+					<p>Po drugiej stronie — czyjaś pensja, czynsz, faktura. My jako inżynierowie widzimy to inaczej: request, event, queue, batch, settlement.</p>
+					<p>I każdy z tych kroków może się zepsuć. Pytanie: jak projektujemy system, żeby to się nie zdarzało?</p>
+				</aside>
+				</section>
+				<section>
+					<div class="img-swap">
+						<img class="img-swap__base" src="img/ing.webp" />
+						<img class="fragment img-swap__reveal" src="img/money.jpg" />
+					</div>
+					<aside class="notes">
+						<ul>
+							<li>15 stycznia 2026</li>
+							<li>dublowanie transakcji w historii</li>
+							<li>podwójne księgowanie</li>
+						</ul>
+					</aside>
+				</section>
+				<section>
+					<h2>O mnie</h2>
+					<div class="bio">
+						<ul>
+							<li>Banki, fintechy, startupy</li>
+							<li>Fullstack, Architektura oprogramowania</li>
+							<li>Po godzinach jazda na szosie i wiele różnych sportów</li>
+						</ul>
+						<img class="bio__photo" src="img/me.jpeg" />
+					</div>
+				<aside class="notes">
+					<p>Kilka słów o sobie.</p>
+					<p>Pracowałem z bankami, fintechami i startupami — różne wymagania w każdym kontekście.</p>
+					<p>Fullstack z zacięciem do architektury — lubię myśleć o systemach jako całości.</p>
+					<p>Poza pracą — szosa i sport. Tyle tytułem wstępu, przejdźmy do tematu.</p>
+				</aside>
+				</section>
+				<section>
+					<h2>Czym jest w ogóle to EDA?</h2>
+				<aside class="notes">
+					<p>Zanim wejdziemy w szczegóły — ustalmy fundamenty.</p>
+					<p>EDA, Event-Driven Architecture, to styl architektoniczny, gdzie komponenty komunikują się przez zdarzenia, nie przez bezpośrednie wywołania.</p>
+					<p>Żeby to zrozumieć, porównajmy dwa modele komunikacji.</p>
+				</aside>
+				</section>
+				<section>
+					<h3>Komunikacja Synchroniczna</h3>
+					<p class="comm-desc">Nadawca czeka na odpowiedź</p>
+					<div class="cols" style="align-items: center;">
+						<div>
+							<img src="img/sync.png" class="slide-img" />
+						</div>
+						<div>
+							<div class="tech-tags">
+								<span class="tech-tag">HTTP / HTTPS</span>
+								<span class="tech-tag">gRPC</span>
+								<span class="tech-tag">SOAP</span>
+							</div>
+						</div>
+					</div>
+				<aside class="notes">
+					<p>Komunikacja synchroniczna — nadawca wysyła request i czeka na odpowiedź.</p>
+					<p>HTTP i gRPC — klasyczne API call. SOAP — starszy format, wciąż żywy w bankach.</p>
+					<p>Zaleta: prostota, wynik od razu. Wada: jeśli odbiorca padnie — nadawca jest zablokowany.</p>
+					<p>W systemie płatniczym to nieakceptowalne. API Gateway timeout: 29 sekund. BACS batch: 3 minuty.</p>
+				</aside>
+				</section>
+				<section>
+					<h3>Komunikacja Asynchroniczna</h3>
+					<p class="comm-desc">Nadawca nie czeka — zdarzenie żyje własnym życiem</p>
+					<div class="cols" style="align-items: center;">
+						<div>
+							<img src="img/async.png" class="slide-img" />
+						</div>
+						<div>
+							<div class="tech-tags">
+								<span class="tech-tag tech-tag--async">Message Queue</span>
+								<span class="tech-tag tech-tag--async">Event Stream</span>
+								<span class="tech-tag tech-tag--async">Event Bus</span>
+							</div>
+						</div>
+					</div>
+				<aside class="notes">
+					<p>Komunikacja asynchroniczna — nadawca publikuje zdarzenie i idzie dalej. Nie czeka.</p>
+					<p>Message Queue (SQS, RabbitMQ): event czeka w kolejce aż konsument go odbierze.</p>
+					<p>Event Stream (Kafka, Kinesis): log eventów, można czytać historycznie. Konsument zarządza własnym offsetem.</p>
+					<p>Kluczowa różnica: producent nie wie nic o konsumentach. Dodajesz nowy serwis — producent nic nie zmienia.</p>
+					<p>W finansach krytyczne: AML check, settlement, notyfikacje — każdy idzie swoją drogą, niezależnie.</p>
+				</aside>
+				</section>
+
+				<section>
+					<h2>Trzy kluczowe pojęcia</h2>
+					<div class="concept-cards">
+						<div class="concept-card fragment">
+							<div class="concept-card__label">Event</div>
+							<h4 class="concept-card__title">Niezmienny fakt</h4>
+							<p class="concept-card__desc">
+								<ul>
+									<li>Coś się stało</li>
+									<li>Nie można tego zmienić</li>
+									<li>Reprezentuje przeszłość</li>
+								</ul>
+							</p>
+						</div>
+						<div class="concept-card fragment">
+							<div class="concept-card__label">Broker</div>
+							<h4 class="concept-card__title">Infrastruktura dostarczająca eventy</h4>
+							<p class="concept-card__desc">
+								<ul>
+									<li>Przechowuje i dostarcza eventy</li>
+									<li>Może zapewniać gwarancje dostarczenia</li>
+									<li>Może transformować eventy</li>
+								</ul>
+							</p>
+						</div>
+						<div class="concept-card fragment">
+							<div class="concept-card__label">Consumer</div>
+							<h4 class="concept-card__title">Serwis reagujący</h4>
+							<p class="concept-card__desc">
+								<ul>
+									<li>Subskrybuje eventy</li>
+									<li>Reaguje na nie</li>
+									<li>Może publikować kolejne eventy</li>
+								</ul>
+							</p>
+						</div>
+					</div>
+				<aside class="notes">
+					<p>Trzy pojęcia, które będą się przewijać przez całą prezentację.</p>
+					<p>Event — niezmienny fakt. Coś się stało. PaymentInitiated, AMLCheckPassed. Nie "zainicjuj płatność" (komenda), ale "płatność została zainicjowana" (fakt). Przeszłość, immutable.</p>
+					<p>Broker — infrastruktura dostarczająca eventy: SQS, Kafka, Kinesis. Buforuje gdy konsument jest niedostępny. Może gwarantować dostarczenie "at least once" lub "exactly once".</p>
+					<p>Konsument — serwis reagujący na event. AML service na PaymentInitiated. Notification na PaymentCompleted. Każdy niezależnie, może wpaść i wstać bez wpływu na innych.</p>
+				</aside>
+				</section>
+
+				<section>
+					<h2>Dlaczego Event-Driven?</h2>
+					<div class="why-cards">
+						<div class="why-card fragment">
+							<h4 class="why-card__title">Loose coupling</h4>
+							<p class="why-card__desc">Serwisy nie znają się nawzajem. Dodajesz nowego konsumenta — zero zmian w producencie.</p>
+						</div>
+						<div class="why-card fragment">
+							<h4 class="why-card__title">Resilience</h4>
+							<p class="why-card__desc">Serwis padł? Eventy czekają w kolejce</p>
+						</div>
+						<div class="why-card fragment">
+							<h4 class="why-card__title">Skalowalność</h4>
+							<p class="why-card__desc">Każdy konsument skaluje się niezależnie. Wąskie gardło jednego nie blokuje reszty.</p>
+						</div>
+						<div class="why-card fragment">
+							<h4 class="why-card__title">Temporal decoupling</h4>
+							<p class="why-card__desc">Producent i konsument nie muszą działać równocześnie</p>
+						</div>
+						<div class="why-card fragment">
+							<h4 class="why-card__title">Audit trail</h4>
+							<p class="why-card__desc">Strumień eventów = pełna historia</p>
+						</div>
+					</div>
+				<aside class="notes">
+					<p>Pięć powodów, dlaczego EDA — i dlaczego każdy z nich ma szczególne znaczenie w finansach.</p>
+					<p>Loose coupling: serwisy nie znają się nawzajem. Dodajesz fraud detection — nie zmieniasz payment service. Architektura, która rośnie bez regressji.</p>
+					<p>Resilience: serwis padł? Eventy czekają w kolejce. Kiedy wstaje — przetwarza backlog. W systemie synchronicznym nadawca dostaje błąd natychmiast.</p>
+					<p>Skalowalność: wąskie gardło w AML? Dorzucasz instancje AML service. Reszta systemu nie wie.</p>
+					<p>Temporal decoupling: kluczowe dla BACS. Twój system zapisuje event w poniedziałek, BACS batch przetwarza we wtorek. Nie muszą działać równocześnie.</p>
+					<p>Audit trail: strumień eventów = pełna historia. Wymóg regulacyjny FCA, PSD2. Nie musisz rekonstruować co się stało — masz zapis każdego eventu z timestampem.</p>
+				</aside>
+				</section>
+
+				<section>
+					<h2>Dlaczego EDA w finansach to inna liga?</h2>
+					<table class="compare-table">
+						<thead>
+							<tr>
+								<th></th>
+								<th>E-commerce</th>
+								<th>FinTech</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td class="compare-table__label">Zgubione zdarzenie</td>
+								<td>Produkt nie wyświetlony</td>
+								<td>Brakująca płatność</td>
+							</tr>
+							<tr>
+								<td class="compare-table__label">Duplikat</td>
+								<td>Podwójny e-mail</td>
+								<td>Podwójne obciążenie</td>
+							</tr>
+							<tr>
+								<td class="compare-table__label">Zła kolejność</td>
+								<td>Dziwny interfejs</td>
+								<td>Naruszenie compliance</td>
+							</tr>
+							<tr>
+								<td class="compare-table__label">Opóźnienie</td>
+								<td>Wolna strona</td>
+								<td>Przegapione okno rozliczeniowe</td>
+							</tr>
+						</tbody>
+					</table>
+					<blockquote class="blockquote--sm" style="margin-top: 1.6em;">
+						W e-commerce zgubiony event to <strong>niedogodność</strong>.<br>
+						W fintechu to <strong>czyjeś pieniądze</strong> i <strong>potencjalne problemy</strong>.
+					</blockquote>
+				<aside class="notes">
+					<p>Porównanie, które lubię pokazywać.</p>
+					<p>W e-commerce zgubiony event = produkt nie wyświetlony. Użytkownik odświeży stronę. W fintechu = brakująca płatność. Ktoś nie dostał pensji w piątek wieczór.</p>
+					<p>Duplikat w e-commerce = podwójny e-mail. Irytujące. W fintechu = podwójne obciążenie konta. Chargebacks, regulatorzy, kancelarie.</p>
+					<p>Zła kolejność w e-commerce = dziwny interfejs. W fintechu = naruszenie compliance. AML check po settlement? Powodzenia z audytem.</p>
+					<p>Opóźnienie w e-commerce = wolna strona. W fintechu = przegapione okno BACS. Przelew czeka kolejne 24 godziny.</p>
+					<p>W fintechu potencjalna kara finansowa lub regulacyjna.</p>
+					<p>To nie przesada. To jest dlaczego fintech stawia wyższe wymagania — i dlaczego warto rozumieć te systemy głębiej.</p>
+				</aside>
+				</section>
+
+				<section>
+					<h2>Czym jest BACS?</h2>
+					<p class="bacs-intro">Brytyjski system rozliczeń międzybankowych — działa od 1968 roku.</p>
+					<div class="bacs-types">
+						<p><span class="bacs-type-label">Direct Credit</span> — pensje, wypłaty, zwroty</p>
+						<p><span class="bacs-type-label">Direct Debit</span> — rachunki, subskrypcje</p>
+					</div>
+					<div class="bacs-banner">
+						<div class="bacs-banner__title">3-dniowy cykl rozliczeniowy</div>
+						<div class="bacs-banner__sub">Nie real-time. Batch processing.</div>
+					</div>
+					<aside class="notes">
+						<p>BACS (Bankers' Automated Clearing Services)</p>
+						<p>Brytyjski system rozliczeń międzybankowych, który przetwarza przelewy typu Direct Credit (wypłaty, pensje, zwroty) i Direct Debit (ściąganie opłat za subskrypcje, rachunki)</p>
+						<p>W 2024 roku BACS przetwarzał około 3 miliardy transakcji o wartości 5 bilionów funtów.</p>
+						<p>Działa od 1968 roku.</p>
+						<p>BACS nie jest real-time. To system batch processing z 3-dniowym cyklem rozliczeniowym. W erze, gdzie jesteśmy przyzwyczajeni do natychmiastowych przelewów, BACS działa w rytmie, który bardziej przypomina pocztę niż API.</p>
+						<p>Jak modelujesz 3-dniowy cykl w event-driven systemie?</p>
+					</aside>
+				</section>
+
+				<section>
+					<h2 class="bacs-title">BACS — 3-dniowy cykl</h2>
+					<div class="bacs-timeline__labels">
+						<span class="bacs-label bacs-label--green fragment" data-fragment-index="0">Pon 07:00</span>
+						<span class="bacs-label bacs-label--yellow fragment" data-fragment-index="1">Wt 10:00</span>
+						<span class="bacs-label bacs-label--green fragment" data-fragment-index="2">Śr 10:00</span>
+					</div>
+					<div class="bacs-timeline__track">
+						<div class="bacs-h-line"></div>
+						<div class="bacs-dot bacs-dot--green fragment" data-fragment-index="0"></div>
+						<div class="bacs-dot bacs-dot--yellow fragment" data-fragment-index="1"></div>
+						<div class="bacs-dot bacs-dot--green fragment" data-fragment-index="2"></div>
+					</div>
+					<div class="bacs-days">
+						<div class="bacs-day bacs-day--green fragment fade-up" data-fragment-index="0">
+							<span class="bacs-day__tag">Day 0</span>
+							<h3 class="bacs-day__title">Input Day</h3>
+							<div class="bacs-day__desc">
+								<span>Generujesz plik Standard 18</span>
+								<span>Wysyłasz przez Bacstel-IP</span>
+								<span>Fixed-width, 100 znaków/linia</span>
+							</div>
+						</div>
+						<div class="bacs-day bacs-day--yellow fragment fade-up" data-fragment-index="1">
+							<span class="bacs-day__tag">Day 1</span>
+							<h3 class="bacs-day__title">Processing Day</h3>
+							<div class="bacs-day__desc">
+								<span>BACS waliduje transakcje</span>
+								<span>Akceptacja / Odrzucenie</span>
+								<span>Pieniądze jeszcze się nie ruszyły</span>
+							</div>
+						</div>
+						<div class="bacs-day bacs-day--green fragment fade-up" data-fragment-index="2">
+							<span class="bacs-day__tag">Day 2</span>
+							<h3 class="bacs-day__title">Settlement Day</h3>
+							<div class="bacs-day__desc">
+								<span>Pieniądze przechodzą</span>
+								<span>Bank nadawcy obciążony</span>
+								<span>Odbiorca widzi przelew</span>
+							</div>
+						</div>
+					</div>
+				<aside class="notes">
+					<p>Trzy dni. Trzy eventy domenowe. Klikamy i odsłaniamy po kolei.</p>
+					<p>Day 0 — Input Day. Poniedziałek, 7:00. Twój system generuje plik Standard 18 (stary fixed-width format, 100 znaków na linię) i wysyła przez Bacstel-IP. Nieprzekraczalny deadline — spóźnisz się o minutę, czekasz do jutra.</p>
+					<p>Day 1 — Processing Day. Wtorek. BACS waliduje transakcje, sprawdza sort codes, numery kont. Pieniądze jeszcze się nie ruszyły — to tylko akceptacja lub odrzucenie.</p>
+					<p>Day 2 — Settlement Day. Środa. Pieniądze faktycznie przechodzą. Bank nadawcy obciążony. Odbiorca widzi przelew.</p>
+					<p>Pytanie: jak modelujesz w event-driven systemie oczekiwanie 3 dni między submitowaniem a settlementem?</p>
+				</aside>
+				</section>
+			<section>
+					<h2>Standard 18 — format pliku BACS</h2>
+					<p class="comm-desc">100 znaków na linię</p>
+					<pre class="s18-code"><code class="language-plaintext">VOL1BACSTELIP 000001
+HDR1A083608  PAYMENTS 01      01 00001 26011500000000
+2 083608 12345678 99 161302 87654321 00000012500 JAN KOWALSKI       PENSJA 01
+2 083608 98765432 99 161302 87654321 00000005000 ANNA NOWAK         ZWROT
+2 083608 11223344 01 161302 87654321 00000002399 NETFLIX PL         SUB-2025
+EOF1A083608  PAYMENTS 01      000003 00000019899
+EOV1                          000001</code></pre>
+					<div class="s18-legend">
+						<span><strong>Col 1:</strong> typ rekordu (2=transakcja)</span>
+						<span><strong>Col 3–8:</strong> sort code</span>
+						<span><strong>Col 10–17:</strong> nr konta</span>
+						<span><strong>Col 19–20:</strong> typ (99=Credit, 01=Debit)</span>
+						<span><strong>Col 34–44:</strong> kwota w pensach</span>
+					</div>
+					<aside class="notes">
+					<p>Standard 18 to format pliku używany w systemie BACS do przesyłania instrukcji płatności między bankami. Każda linia ma dokładnie 100 znaków, a struktura jest sztywno określona.</p>
+					<p>W przykładzie mamy rekord nagłówkowy (HDR), trzy rekordy transakcyjne (2) i rekord końcowy (EOF). Kolumny zawierają takie informacje jak sort code, numer konta, typ transakcji (Credit lub Debit) oraz kwotę w pensach.</p>
+					<p>Jak modelować taki sztywny, batchowy format w event-driven systemie, który preferuje luźne powiązanie i natychmiastową reakcję?</p>
+				</aside>
+				</section>
+			<section>
+					<h2>Architektura: BACS na AWS</h2>
+					<img src="img/bacs.png" class="slide-img" />
+				<aside class="notes">
+					<p>Tutaj widać pełną architekturę systemu BACS opartą na AWS.</p>
+					<p>Po lewej: API Gateway + Lambda. Klient wysyła POST /payment. Prosta synchroniczna fasada nad asynchronicznym systemem.</p>
+					<p>Pośrodku: serce systemu. SQS jako bufor, Lambda do przetwarzania, DynamoDB do stanu, S3 do plików.</p>
+					<p>Faza 1: walidacja i AML check. Event: PaymentInitiated → AMLCheckPassed → PaymentQueuedForBatch. Trwa sekundy.</p>
+					<p>Faza 2: co noc o północy — Lambda agreguje przelewy AWAITING_BATCH, generuje plik Standard 18, wysyła do BACS przez Bacstel-IP.</p>
+					<p>Faza 3: BACS zwraca wyniki, Step Functions obsługuje cykl trzydniowy — czeka na settlement, publikuje PaymentCompleted.</p>
+					<p>Każda faza to osobna Lambda, osobna kolejka. Awaria jednej nie blokuje pozostałych.</p>
+				</aside>
+				</section>
+			<section>
+					<h2>BACS — event flow jednego przelewu</h2>
+					<div class="ev-timeline">
+						<div class="ev-timeline__line"></div>
+						<div class="ev-row fragment fade-up">
+							<span class="ev-time">Pon 14:30</span>
+							<span class="ev-dot ev-dot--green"></span>
+							<span class="ev-name ev-name--green">PaymentInitiated</span>
+						</div>
+						<div class="ev-row fragment fade-up">
+							<span class="ev-time">Pon 14:30</span>
+							<span class="ev-dot ev-dot--green"></span>
+							<span class="ev-name ev-name--green">AMLCheckPassed</span>
+						</div>
+						<div class="ev-row fragment fade-up">
+							<span class="ev-time">Pon 14:31</span>
+							<span class="ev-dot ev-dot--yellow"></span>
+							<span class="ev-name ev-name--yellow">PaymentQueuedForBatch</span>
+						</div>
+						<div class="ev-row fragment fade-up">
+							<span class="ev-time">Wt&nbsp; 06:12</span>
+							<span class="ev-dot ev-dot--orange"></span>
+							<span class="ev-name ev-name--orange">BacsBatchSubmitted</span>
+						</div>
+						<div class="ev-row fragment fade-up">
+							<span class="ev-time">Śr&nbsp; 09:47</span>
+							<span class="ev-dot ev-dot--green"></span>
+							<span class="ev-name ev-name--green">BacsTransactionAccepted</span>
+						</div>
+						<div class="ev-row fragment fade-up">
+							<span class="ev-time">Czw 10:15</span>
+							<span class="ev-dot ev-dot--green"></span>
+							<span class="ev-name ev-name--green">PaymentCompleted</span>
+						</div>
+						<div class="ev-row fragment fade-up">
+							<span class="ev-time">Czw 10:15</span>
+							<span class="ev-dot ev-dot--green"></span>
+							<span class="ev-name ev-name--green">CustomerNotified</span>
+						</div>
+					</div>
+					<div class="ev-summary fragment fade-up">
+						Poniedziałek 14:30 → Czwartek 10:15<br>
+						7 eventów &middot; 4 dni &middot; 2 dni robocze przetwarzania
+					</div>
+				<aside class="notes">
+					<p>Śledzimy jeden przelew od początku do końca. Klikamy po jednym evencie.</p>
+					<p>PaymentInitiated — 14:30 w poniedziałek. Klient kliknął "Wyślij".</p>
+					<p>AMLCheckPassed — 14:30. AML service sprawdza w ciągu sekund. Green light.</p>
+					<p>PaymentQueuedForBatch — 14:31. Przelew czeka. Nic nie dzieje się do jutra.</p>
+					<p>(przerwa — batch działa co noc o północy)</p>
+					<p>BacsBatchSubmitted — 06:12 we wtorek. Batch job zebrał wszystkie oczekujące i wysłał do BACS.</p>
+					<p>BacsTransactionAccepted — 09:47 w środę. BACS potwierdził akceptację.</p>
+					<p>PaymentCompleted + CustomerNotified — 10:15 w czwartek. Settlement. E-mail do klienta.</p>
+					<p>4 dni. 7 eventów. Każdy jest audit trailem z timestampem. Każdy immutable.</p>
+					<p>I teraz pytanie — co może pójść nie tak między którymkolwiek z tych eventów?</p>
+				</aside>
+				</section>
+				<section>
+					<img src="img/wrong.jpg" style="display:block; margin: auto;" />
+				<aside class="notes">
+					<p>To jest reakcja, którą często widzę, kiedy mówię o tym jak działa BACS.</p>
+					<p>Albo: "To nie jest problem, my testujemy".</p>
+					<p>Za chwilę zobaczycie 4 pułapki, które każdy napotkał. W produkcji.</p>
+				</aside>
+				</section>
+				<section>
+					<h2>RBS / NatWest — 2012</h2>
+					<div class="case-stats">
+						<div class="case-stat">
+							<span class="case-stat__num">3–4</span>
+							<span class="case-stat__label">dni głównej awarii</span>
+						</div>
+						<div class="case-stat">
+							<span class="case-stat__num">12M</span>
+							<span class="case-stat__label">klientów dotkniętych</span>
+						</div>
+						<div class="case-stat">
+							<span class="case-stat__num">£56M</span>
+							<span class="case-stat__label">kara FCA</span>
+						</div>
+					</div>
+					<div class="case-body">
+						<div class="case-item">19 czerwca 2012 — upgrade oprogramowania systemu batch. System BACS przestał przetwarzać pliki.</div>
+						<div class="case-item">3–4 dni największych zakłóceń. ~1 tydzień do przywrócenia usług. Tygodnie na wyczyszczenie backlogu.</div>
+						<div class="case-item">Pensje nie dotarły. Direct Debity nie przeszły. Kredyty naliczały kary za "nieterminowe" płatności.</div>
+					</div>
+					<p class="case-root">Przyczyna: single point of failure w systemie batchowym. Brak możliwości wycofania po aktualizacji.<br/> Zero circuit breaker.</p>
+					<aside class="notes">
+						<p>Awaria miała kilka warstw czasowych: 19 czerwca — start. Największe zakłócenia przez pierwsze 3–4 dni (do ok. 22–23 czerwca). Pełne przywracanie usług: do tygodnia. Usuwanie skutków i czyszczenie backlogu: nawet kilka tygodni.</p>
+						<p>Upgrade oprogramowania obsługującego przetwarzanie plików BACS. Batch pipeline przestał działać. 12 milionów klientów bez normalnych przelewów.</p>
+						<p>Pensje nie dotarły — ludzie nie mogli opłacić hipoteki, czynszu, rachunków. Banki naliczały kary za nieterminowe płatności spowodowane awarią, nie winą klientów.</p>
+						<p>Kluczowy efekt 3-dniowego cyklu BACS: każdy dzień naprawy to nie "cofamy się o dzień" — to nowe okno. Backlog przelewów rósł dopóki pipeline nie wrócił do pełnej przepustowości.</p>
+						<p>FCA ukarała RBS Group kwotą £56 milionów. Najwyższa kara w historii FCA w tamtym momencie.</p>
+						<p>Przyczyna: jedna maszyna, jeden punkt awarii, brak możliwości rollback, brak circuit breaker. Rzeczy, o których rozmawiamy na tej prezentacji.</p>
+						<p>Ktoś moze powiedziec, Lukasz w 2012 to było dawno temu... Wtedy Piszczek strzelił gola Rosji na Euro 2012</p>
+					</aside>
+				</section>
+				<section>
+					<h2>To się naprawdę zdarza</h2>
+					<div class="incident-list">
+						<div class="incident-row">
+							<div class="incident-meta">
+								<span class="incident-who">TSB Bank</span>
+								<span class="incident-when">2018</span>
+							</div>
+							<div class="incident-body">
+								<p class="incident-what">Migracja danych między systemami — 5 dni outage. 1.9 mld GBP strat.</p>
+								<p class="incident-detail">1.9 mln klientów bez dostępu. Płatności gubione, duplikowane. CEO zrezygnował.</p>
+							</div>
+						</div>
+						<div class="incident-row">
+							<div class="incident-meta">
+								<span class="incident-who">Visa Europe</span>
+								<span class="incident-when">2018</span>
+							</div>
+							<div class="incident-body">
+								<p class="incident-what">Awaria centrum przetwarzania — 10h outage. ~5 mln transakcji odrzuconych.</p>
+								<p class="incident-detail">Pojedynczy punkt awarii w architekturze eventowej. Brak failover.</p>
+							</div>
+						</div>
+						<div class="incident-row">
+							<div class="incident-meta">
+								<span class="incident-who">Revolut</span>
+								<span class="incident-when">2024</span>
+							</div>
+							<div class="incident-body">
+								<p class="incident-what">Bug w systemie płatności — środki pobierane bez zgody użytkowników.</p>
+								<p class="incident-detail">Race condition przy przetwarzaniu eventów. Idempotency nie była egzekwowana.</p>
+							</div>
+						</div>
+					</div>
+					<p class="incident-footer">Każdy z tych systemów był "przetestowany". Żaden nie był gotowy na to co się stało.</p>
+					<aside class="notes">
+						<p>Trzy realne incydenty. Każdy z nich to architektoniczny błąd, który omawiamy na tej prezentacji.</p>
+						<p>TSB 2018: migracja 1.3 mld rekordów z jednego systemu core bankowego na drugi. Event-driven pipeline z niedostateczną obsługą błędów. Przez 5 dni klienci widzieli cudze konta, przelewy ginęły, duplikaty. Koszt: 1.9 mld GBP. CEO odszedł.</p>
+						<p>Visa 2018: centrum przetwarzania w Basingstoke — pojedynczy punkt awarii. 10 godzin, 5 milionów transakcji odrzuconych. Wiele sklepów nie mogło przyjmować płatności kartą w całej Europie.</p>
+						<p>Revolut 2024: race condition przy współbieżnym przetwarzaniu eventów płatności. Brak idempotency na poziomie bazy danych — ten sam event przetworzony kilkukrotnie. Środki pobierane wielokrotnie.</p>
+						<p>Wszystkie te systemy miały testy. Wszystkie miały code review. Brakło przemyślanej architektury dla edge cases.</p>
+					</aside>
+				</section>
+				<section class="slide-interlude">
+					<h1 class="interlude__title" style="color: #0a2e52;">4 pułapki EDA w płatnościach</h1>
+				</section>
+				<section>
+					<div class="trap-header">
+						<div class="trap-badge">1</div>
+						<h2 class="trap-title">Duplikaty — przelew dwa razy w BACS batchu</h2>
+					</div>
+					<p class="trap-phase">Faza 1 — zbieranie przelewów</p>
+					<div class="trap-box">
+						<ol class="trap-list">
+							<li class="trap-item trap-item--white">Lambda w Fazie 1 przetwarza przelew na 5 000 zł (walidacja, AML)</li>
+							<li class="trap-item trap-item--white">Zapisuje do S3/DynamoDB jako AWAITING_BATCH</li>
+							<li class="trap-item trap-item--yellow">Zapis OK, ale Lambda robi timeout zanim usunie event z SQS</li>
+							<li class="trap-item trap-item--orange">SQS dostarcza event ponownie → przelew ląduje w bazie dwa razy</li>
+							<li class="trap-item trap-item--orange">Faza 2 generuje batch z duplikatem → BACS obciąża konto 2×</li>
+						</ol>
+						<p class="trap-result">Wynik: 10 000 zł zamiast 5 000 zł</p>
+					</div>
+					<p class="trap-footer">BACS nie sprawdzi za Ciebie — plik z duplikatem przejdzie walidację.</p>
+				<aside class="notes">
+					<p>Pułapka pierwsza i najczęstsza w systemach płatniczych.</p>
+					<p>Scenariusz: Lambda przetwarza przelew na 5 000 zł. Walidacja OK, AML OK, zapis do bazy OK. Ale Lambda robi timeout zanim usunie event z SQS.</p>
+					<p>SQS nie wie, że przelew został przetworzony. Po visibility timeout — dostarcza event ponownie. Lambda przetwarza ponownie. Dwa rekordy w bazie.</p>
+					<p>Faza 2 zbiera batch — zbiera dwa. BACS nie sprawdza duplikatów po Twojej stronie — jeśli wyślesz dwa przelewy z różnymi ID, oba przejdą.</p>
+					<p>Konto klienta obciążone dwukrotnie. BACS nie jest tu problemem — Twój system nie był idempotentny.</p>
+					<p>Kto z Was spotkał taki scenariusz?</p>
+				</aside>
+				</section>
+				<section>
+					<h2 style="color: #26a69a;">Rozwiązanie: Idempotency</h2>
+					<pre style="font-size: 0.45em;"><code class="language-javascript" data-trim>
+async function processPayment(event) {
+  const key = event.idempotencyKey;
+
+  try {
+    await dynamodb.put({
+      Item: { key, status: 'PROCESSING', ttl: now()+24h },
+      ConditionExpression: 'attribute_not_exists(key)'
+    });
+  } catch (e) {
+    if (ConditionalCheckFailed) return existing.result;
+  }
+
+  const result = await executeBankingPayment(event);
+  await dynamodb.update({ key, status:'COMPLETED', result });
+  return result;
+}
+					</code></pre>
+					<p style="font-style: italic; color: #26a69a; font-size: 0.55em; margin-top: 0.6em;">Duplikat? Zwróć zapisany wynik. Zero ponownego przetwarzania.</p>
+				<aside class="notes">
+					<p>Rozwiązanie jest eleganckie.</p>
+					<p>Przed przetworzeniem — zapisz w DynamoDB klucz idempotentności z statusem PROCESSING. Jeśli klucz już istnieje — zwróć zapisany wynik, nie przetwarzaj ponownie.</p>
+					<p>ConditionExpression "attribute_not_exists(key)" — atomowy sprawdzian. Dwa równoległe wywołania próbują zapisać ten sam klucz — tylko jedno wygra. Drugie dostanie wyjątek i zwróci zapisany wynik.</p>
+					<p>TTL — po 24h klucz się usuwa automatycznie. Nie musisz czyścić ręcznie.</p>
+					<p>Klucz idempotentności = payment ID + hash paymentu, albo idempotencyKey przekazany przez klienta.</p>
+					<p>Zasada: każda operacja z efektami ubocznymi w systemie płatniczym musi być idempotentna. Bez wyjątków.</p>
+				</aside>
+				</section>
+				<section>
+					<h2>Outbox Pattern — atomowe publikowanie eventów</h2>
+					<div class="outbox-cols">
+						<div class="outbox-col outbox-col--bad">
+							<p class="outbox-col__title">❌ Bez Outbox</p>
+							<div class="outbox-step">INSERT payment → DB <span class="step-ok">✓</span></div>
+							<div class="outbox-step">COMMIT <span class="step-ok">✓</span></div>
+							<div class="outbox-step step-crash">publish → SQS &nbsp;💥&nbsp; crash</div>
+							<div class="outbox-result">Event lost. Przelew w DB, brak eventu.<br>System nie wie co się stało.</div>
+						</div>
+						<div class="outbox-col outbox-col--good">
+							<p class="outbox-col__title">✓ Outbox Pattern</p>
+							<div class="outbox-step step-tx">BEGIN TRANSACTION</div>
+							<div class="outbox-step">INSERT payment → DB <span class="step-ok">✓</span></div>
+							<div class="outbox-step">INSERT outbox_events <span class="step-ok">✓</span></div>
+							<div class="outbox-step step-tx">COMMIT &nbsp;<span style="color:#81c784;">atomic!</span></div>
+							<div class="outbox-relay">
+								Relay poller → czyta outbox<br>
+								→ publikuje do SQS<br>
+								→ marks <code>published = true</code>
+							</div>
+						</div>
+					</div>
+					<p class="outbox-footer">Crash po COMMIT? Relay ponowi wywołanie. Idempotency po stronie konsumenta obsłuży duplikat.</p>
+					<aside class="notes">
+						<p>Idempotency rozwiązuje przetwarzanie dwa razy. Ale skąd bierze się ten problem?</p>
+						<p>Masz dwie operacje: zapisz do DB i opublikuj event do SQS. To nie jest atomowe. Jeśli crash między nimi — payment jest w DB, ale eventu nie ma. Przelew "zniknął" z systemu eventowego.</p>
+						<p>Outbox Pattern: zamiast publikować bezpośrednio do SQS, zapisujesz event do tabeli outbox w TYM SAMYM database transaction co payment. Atomic commit — albo oba, albo żaden.</p>
+						<p>Osobny relay service czyta outbox i publikuje do SQS. Może retry bezpiecznie. Jeśli relay crashnie — przy starcie czyta co niepublikowane.</p>
+						<p>Wynik: gwarancja "at least once delivery". W połączeniu z idempotency na konsumentze — effectively exactly once.</p>
+						<p>Często zamiast pollera używa się CDC (Change Data Capture), np. Debezium — nasłuchuje zmian w tabeli outbox bezpośrednio na poziomie transaction log DB i publikuje eventy automatycznie. Zero pollingu, minimalne opóźnienie.</p>
+						<p>To fundamentalny wzorzec w każdym systemie płatniczym. Często niedoceniany aż do pierwszego incydentu z "zaginionym przelewem".</p>
+					</aside>
+				</section>
+				<section>
+					<div class="trap-header">
+						<div class="trap-badge trap-badge--orange">2</div>
+						<h2 class="trap-title">Dead Letter Queue — przelew nie trafił do batcha</h2>
+					</div>
+					<p class="trap-phase trap-phase--orange">Faza 1→2 — event ginie zanim trafi do pliku</p>
+					<div class="trap-cards">
+						<div class="trap-card">
+							<span class="trap-card__icon">!</span>
+							<h4 class="trap-card__title">Poison message</h4>
+							<p class="trap-card__desc">Sort code w złym formacie — walidacja pada</p>
+						</div>
+						<div class="trap-card">
+							<span class="trap-card__icon">↺</span>
+							<h4 class="trap-card__title">Transient failure</h4>
+							<p class="trap-card__desc">AML check niedostępny — przelew nie przechodzi Fazy 1</p>
+						</div>
+						<div class="trap-card">
+							<span class="trap-card__icon">?</span>
+							<h4 class="trap-card__title">Business logic</h4>
+							<p class="trap-card__desc">Konto zamknięte między init a batch — brak obsługi</p>
+						</div>
+						<div class="trap-card">
+							<span class="trap-card__icon">⏱</span>
+							<h4 class="trap-card__title">Timeout cascade</h4>
+							<p class="trap-card__desc">Lambda → Step Functions → API — cały łańcuch timeout</p>
+						</div>
+					</div>
+					<h3 class="dlq-title">Obsługa DLQ </h3>
+					<ul class="dlq-list">
+						<li>Alerty z kontekstem — ile, jak długo czeka, jakie typy</li>
+						<li>Kategoryzacja po severity — 50 zł ≠ 500 000 zł</li>
+						<li>Controlled replay — batch po 10, z throttlingiem</li>
+						<li>DLQ dashboard — nie każ on-call klikać po konsoli o 3 w nocy</li>
+						<li>Post-mortem na każdy incident</li>
+					</ul>
+				<aside class="notes">
+					<p>Pułapka druga: co się dzieje kiedy event nie może być przetworzony?</p>
+					<p>Poison message — sort code w złym formacie. Lambda pada za każdym razem. Bez DLQ — event kręci się w kółko wiecznie.</p>
+					<p>Transient failure — AML check niedostępny przez 5 minut. Nie chcesz odrzucać przelewu, chcesz spróbować ponownie.</p>
+					<p>Business logic — konto zamknięte po tym jak płatność została zainicjowana. Normalny retry nie pomaga.</p>
+					<p>Timeout cascade — Lambda → Step Functions → external API — każdy timeout kaskadowo blokuje.</p>
+					<p>DLQ to nie kosz na śmieci — to system bezpieczeństwa. Alert z kontekstem (ile, jak długo, jakie typy), kategoryzacja po kwocie, controlled replay z throttlingiem, dashboard dla on-call.</p>
+					<p>Post-mortem na każdy incident. Każdy przelew na DLQ to potencjalna skargi klienta.</p>
+				</aside>
+				</section>
+				<section>
+					<div class="trap-header">
+						<div class="trap-badge trap-badge--yellow">3</div>
+						<h2 class="trap-title">Kolejność eventów — trzy podejścia</h2>
+					</div>
+					<div class="order-cards">
+						<div class="order-card order-card--teal">
+							<h3 class="order-card__title">SQS FIFO</h3>
+							<div class="order-card__row">
+								<span class="order-check">✓</span>
+								<p>Gwarantuje kolejność</p>
+							</div>
+							<div class="order-card__row">
+								<span class="order-cross">✗</span>
+								<p>Wyższy koszt</p>
+							</div>
+							<div class="order-card__row">
+								<span class="order-cross">✗</span>
+								<p>Trudniejszy setup</p>
+							</div>
+						</div>
+						<div class="order-card order-card--purple">
+							<h3 class="order-card__title">Out-of-order<br>+ rekoncyliacja</h3>
+							<div class="order-card__row">
+								<span class="order-check">✓</span>
+								<p>Wysoki throughput<p>
+							</div>
+							<div class="order-card__row">
+								<span class="order-cross">✗</span>
+								<p>Bałagan w logice</p>
+							</div>
+						</div>
+						<div class="order-card order-card--yellow">
+							<h3 class="order-card__title">Saga pattern<br>(orchestration)</h3>
+							<div class="order-card__row">
+								<span class="order-check">✓</span>
+								<p>Pełna kontrola</p>
+							</div>
+							<div class="order-card__row">
+								<span class="order-check">✓</span>
+								<p>Korekta na każdym kroku</p>
+							</div>
+							<div class="order-card__row">
+								<span class="order-cross">✗</span>
+								<p>Najdroższe w implementacji</p>
+							</div>
+						</div>
+					</div>
+					<p class="trap-footer" style="font-style: italic; color: #f57c00;">Wybór to decyzja biznesowa, nie techniczna — jaki koszt, jeśli eventy przyjdą nie po kolei?</p>
+					<aside class="notes">
+						<p>Trzy podejścia do problemu kolejności eventów w systemach płatniczych.</p>
+						<p><strong>SQS FIFO</strong>: kolejka AWS z gwarantowaną kolejnością. Wbudowany deduplication (MessageDeduplicationId). Limit 300 msg/s lub 3000 z batch. Droższy niż standardowy SQS, ale gotowe, zarządzane rozwiązanie.</p>
+						<p><strong>Out-of-order + rekoncylacja</strong>: akceptujemy eventy w dowolnej kolejności, rekoncyliujemy stan dopiero przy zamknięciu batcha. Wysoki throughput, ale wymaga złożonej logiki retry i obowiązkowego max retries — bez tego ryzykujemy infinite loop.</p>
+						<p><strong>Saga pattern / orchestration</strong>: centralny orchestrator (Step Functions, Temporal.io) zarządza całym flow. Każdy krok ma kompensację (rollback). Pełna kontrola, najdroższa implementacja. Stosowana przy złożonych, długo trwających transakcjach.</p>
+						<p>Kluczowe pytanie: jaka jest cena błędu kolejności? Dla 50 zł — może out-of-order. Dla 500 000 zł — FIFO lub Saga.</p>
+					</aside>
+				</section>
+				<section>
+					<div class="trap-header">
+						<div class="trap-badge trap-badge--purple">4</div>
+						<h2 class="trap-title">Obserwowalność — gdzie jest mój przelew?</h2>
+					</div>
+					<p class="obs-phase">Przelew gdzieś między Fazą 1 a Fazą 3.<br>W której? Jak znaleźć wśród 500 innych tranzakcji?</p>
+					<div class="obs-cards">
+						<div class="obs-card obs-card--teal">
+							<h3 class="obs-card__title">Correlation ID</h3>
+							<p class="obs-card__desc">Jeden UUID w każdym logu, evencie, external call.</p>
+						</div>
+						<div class="obs-card obs-card--purple">
+							<h3 class="obs-card__title">Structured Logging</h3>
+							<p class="obs-card__desc">correlationId, paymentId, service, action, duration.</p>
+						</div>
+						<div class="obs-card obs-card--yellow">
+							<h3 class="obs-card__title">Distributed Tracing</h3>
+							<p class="obs-card__desc">X-Ray / OpenTelemetry. <br/>Wizualizacja wąskich gardeł.</p>
+						</div>
+						<div class="obs-card obs-card--orange">
+							<h3 class="obs-card__title">Metryki biznesowe</h3>
+							<p class="obs-card__desc">Ile in-flight?<br/> Jaki p95?<br/> Ile na DLQ?<br/> SLA hit rate?</p>
+						</div>
+					</div>
+					<p class="trap-footer" style="font-style: italic; color: #26a69a;">Decyzje pomagające w śledzeniu płatności i przy rozwiązywaniu problemów.</p>
+					<aside class="notes">
+						<p><strong>Correlation ID</strong>: jeden UUID generowany przy wejściu płatności do systemu. Przekazywany przez WSZYSTKIE serwisy, logi, eventy, zewnętrzne calle. Bez tego śledzenie błędu = szukanie igły w stogu. Dodaj od dnia pierwszego, retroaktywne dodanie jest bolesne.</p>
+						<p><strong>Structured Logging</strong>: zamiast console.log("płatność przetworzona") — JSON z polami: correlationId, paymentId, service, action, duration, status. Można filtrować, agregować, alertować. CloudWatch Insights, Splunk, Datadog — wszystkie preferują JSON.</p>
+						<p><strong>Distributed Tracing</strong>: AWS X-Ray lub OpenTelemetry. Widać cały span od API Gateway przez Lambda, SQS, do BACS. 12 sekund na AML check jest natychmiast widoczne jako wąskie gardło. Szczególnie cenne przy diagnostyce timeoutów.</p>
+						<p><strong>Metryki biznesowe</strong>: nie tylko techniczne CPU/memory. Mierz: ile płatności in-flight, ile czeka w DLQ, jaki p95 czasu przetwarzania, SLA hit rate. Te metryki rozumie biznes i compliance, nie tylko inżynierowie.</p>
+					</aside>
+				</section>
+				<section>
+					<h2>Legacy banking — adapter pattern</h2>
+					<div class="acl-top">
+						<div class="acl-domain">
+							<pre class="acl-domain__code">Internal Domain
+
+Payment {
+  amount, 
+  currency,
+  recipient
+}</pre>
+						</div>
+						<span class="acl-sep">→</span>
+						<div class="acl-adapters">
+							<div class="acl-adapter">
+								<span class="acl-adapter__name" style="color:#f9a825;">BACS Adapter</span>
+								<span class="acl-adapter__sub">Standard 18 file</span>
+							</div>
+							<div class="acl-adapter">
+								<span class="acl-adapter__name" style="color:#26a69a;">FPS Adapter</span>
+								<span class="acl-adapter__sub">ISO 20022 API</span>
+							</div>
+							<div class="acl-adapter">
+								<span class="acl-adapter__name" style="color:#f57c00;">SWIFT Adapter</span>
+								<span class="acl-adapter__sub">MT103 message</span>
+							</div>
+						</div>
+						<div class="acl-arrows">
+							<span>→</span>
+							<span>→</span>
+							<span>→</span>
+						</div>
+						<div class="acl-networks">
+							<p class="acl-networks__title">Banking Networks</p>
+							<p>Batch files (days)</p>
+							<p>API calls (seconds)</p>
+							<p>MT messages (hours)</p>
+						</div>
+					</div>
+					<div class="acl-box">
+						<h3 class="acl-box__title">Anti-corruption layer</h3>
+						<p class="acl-box__main">Twój core domain nie wie co to MT103 czy Standard 18.</p>
+						<p class="acl-box__highlight">Wie tylko: SENT → ACKNOWLEDGED → SETTLED.</p>
+						<p class="acl-box__sub">SWIFT migruje z MT na MX? Zmieniasz adapter — reszta systemu nie wie.</p>
+					</div>
+				<aside class="notes">
+					<p>Fintech żyje w świecie, gdzie musi rozmawiać ze starymi systemami bankowymi.</p>
+					<p>BACS mówi w języku Standard 18 — fixed-width plik. FPS mówi ISO 20022 — XML API. SWIFT mówi MT103 — 50-letni format wiadomości.</p>
+					<p>Twój core domain nie powinien o tym wiedzieć. Payment w Twoim systemie to: kwota, waluta, odbiorca. Nie interesuje Cię czy to idzie przez BACS czy SWIFT.</p>
+					<p>Adapter pattern: każda sieć bankowa ma swój adapter. BACS Adapter zamienia Payment na Standard 18 file. FPS na ISO 20022. SWIFT na MT103.</p>
+					<p>Anti-corruption layer: Twój core domain nie jest zanieczyszczony terminologią legacy systemów. Wie tylko: SENT → ACKNOWLEDGED → SETTLED.</p>
+					<p>Praktyczna korzyść: SWIFT migruje z MT na MX (ISO 20022)? Zmieniasz jeden adapter. Reszta systemu nie wie. To architektura, która przeżywa 10 lat zmian.</p>
+				</aside>
+				</section>
+				<section>
+					<h2>Jak to działa na produkcji?</h2>
+					<img src="img/unknown.png" style="display:block; margin: auto;" />
+					<aside class="notes">
+						<p>Jak to naprawdę wygląda w produkcji?</p>
+						<p>Każdy system, który opisałem, ktoś musiał zbudować, wdrożyć i utrzymać.</p>
+						<p>Pułapki — duplikaty, DLQ, kolejność, obserwowalność — to nie akademickie przykłady. To rzeczy, które zdarzają się w każdym systemie płatniczym.</p>
+						<p>Dobre wiadomości: każda ma rozwiązanie. Złe: musisz o nich pomyśleć zanim trafią na produkcję, nie po.</p>
+					</aside>
+				</section>
+				<section>
+					<h2>Co zabrać do domu?</h2>
+					<div class="summary-list">
+						<div class="summary-item">
+							<div class="summary-num">1</div>
+							<div class="summary-text">
+								<span class="summary-label">Idempotency</span>
+								<span class="summary-desc">Nie istnieje "na pewno dostarczony raz"</span>
+							</div>
+						</div>
+						<div class="summary-item">
+							<div class="summary-num">2</div>
+							<div class="summary-text">
+								<span class="summary-label">Dead Letter Queue</span>
+								<span class="summary-desc">Alert + kategoryzacja + replay + post-mortem</span>
+							</div>
+						</div>
+						<div class="summary-item">
+							<div class="summary-num">3</div>
+							<div class="summary-text">
+								<span class="summary-label">Correlation ID</span>
+								<span class="summary-desc">W każdym logu, evencie, external call</span>
+							</div>
+						</div>
+						<div class="summary-item">
+							<div class="summary-num">4</div>
+							<div class="summary-text">
+								<span class="summary-label">Kolejność eventów</span>
+								<span class="summary-desc">Jaki koszt, jeśli eventy przyjdą nie po kolei?</span>
+							</div>
+						</div>
+						<div class="summary-item">
+							<div class="summary-num">5</div>
+							<div class="summary-text">
+								<span class="summary-label">Legacy banking</span>
+								<span class="summary-desc">Adapter pattern, anti-corruption layer, akceptacja</span>
+							</div>
+						</div>
+						<div class="summary-item">
+							<div class="summary-num">6</div>
+							<div class="summary-text">
+								<span class="summary-label">Obserwowalność</span>
+								<span class="summary-desc">Ile in-flight, jaki p95, ile na DLQ, SLA hit rate</span>
+							</div>
+						</div>
+					</div>
+				<aside class="notes">
+					<p>Sześć rzeczy na kartkę.</p>
+					<p>Idempotency — nie ma czegoś takiego jak "na pewno dostarczony raz". Każda operacja musi być idempotentna. ConditionExpression w DynamoDB, idempotency key w API.</p>
+					<p>Dead Letter Queue — to nie kosz. To system bezpieczeństwa. Alert, kategoryzacja po kwocie, controlled replay, dashboard, post-mortem.</p>
+					<p>Correlation ID — jeden UUID od pierwszego eventu do ostatniego. Bez tego debugging w produkcji to archaeological dig przez logi.</p>
+					<p>Kolejność eventów — zanim wybierzesz rozwiązanie techniczne, odpowiedz: co się dzieje biznesowo, jeśli eventy przyjdą nie po kolei? Może nic. Może katastrofa.</p>
+					<p>Legacy banking — Adapter pattern i Anti-corruption layer to praktyczne wzorce. Ratują przed przepisywaniem całego systemu gdy bank zmienia protokół.</p>
+					<p>Obserwowalność — metryki biznesowe są ważniejsze niż techniczne. Ile in-flight, ile na DLQ, jaki SLA hit rate — to rozumie nie tylko inżynier, ale i product owner.</p>
+				</aside>
+				</section>
+				<section>
+					<div class="closing-layout">
+						<div class="closing-left">
+							<p class="closing-pre">Event-driven architecture<br>w fintechu to nie architektura.</p>
+							<h1 class="closing-title">To system odpowiedzialności.</h1>
+							<p class="closing-sub">Każdy event to czyjś przelew,<br>czyjeś pieniądze, czyjaś pensja.<br>Projektujcie tak, jakby to były Wasze.</p>
+						</div>
+					</div>
+					<p class="closing-links">github.com/himeno61 &nbsp;·&nbsp; linkedin.com/in/lukasz-binkiewicz</p>
+				<aside class="notes">
+					<p>Zostawiam Was z tym.</p>
+					<p>Event-driven architecture w fintechu to nie wybór technologiczny. To wybór etyczny.</p>
+					<p>Każdy event to przelew czyjegoś klienta. Każdy timeout to chwila, kiedy ktoś czeka na pensję. Każdy duplikat to dwa razy obciążone konto.</p>
+					<p>Projektujcie systemy tak, jakby za każdym requestem stała prawdziwa osoba.</p>
+					<p>Dziękuję. Chętnie odpowiem na pytania.</p>
+				</aside>
+				</section>
+			</div>
+		</div>
+
+		<script src="dist/reveal.js"></script>
+		<script src="dist/plugin/notes.js"></script>
+		<script src="dist/plugin/markdown.js"></script>
+		<script src="dist/plugin/highlight.js"></script>
+		<script>
+			Reveal.initialize({
+				hash: true,
+				slideNumber: 'c/t',
+				plugins: [RevealMarkdown, RevealHighlight, RevealNotes],
+			});
+
+			function dotCenter(dot, timeline) {
+				var top = 0;
+				var el = dot;
+				while (el && el !== timeline) {
+					top += el.offsetTop;
+					el = el.offsetParent;
+				}
+				return top + dot.offsetHeight / 2;
+			}
+
+			function updateEvTimeline() {
+				document.querySelectorAll('.ev-timeline').forEach(function(timeline) {
+					var line = timeline.querySelector('.ev-timeline__line');
+					if (!line) return;
+					var rows = Array.from(timeline.querySelectorAll('.ev-row'));
+					var visibleRows = rows.filter(function(r) {
+						return r.classList.contains('visible');
+					});
+					if (visibleRows.length === 0) {
+						line.style.height = '0px';
+						return;
+					}
+					var firstDot = rows[0].querySelector('.ev-dot');
+					var targetDot = visibleRows[visibleRows.length - 1].querySelector('.ev-dot');
+
+					var topOffset = dotCenter(firstDot, timeline);
+					var bottomOffset = dotCenter(targetDot, timeline);
+					line.style.top = topOffset + 'px';
+					line.style.height = Math.max(0, bottomOffset - topOffset) + 'px';
+				});
+			}
+
+			Reveal.on('fragmentshown', updateEvTimeline);
+			Reveal.on('fragmenthidden', updateEvTimeline);
+
+			function updateBacsTimeline() {
+				var track = document.querySelector('.bacs-timeline__track');
+				if (!track) return;
+				var line = track.querySelector('.bacs-h-line');
+				if (!line) return;
+				var dots = Array.from(track.querySelectorAll('.bacs-dot'));
+				var visibleDots = dots.filter(function(d) {
+					return d.classList.contains('visible');
+				});
+				if (visibleDots.length === 0) {
+					line.style.width = '0px';
+					return;
+				}
+				var firstDot = visibleDots[0];
+				var lastVisibleIndex = dots.indexOf(visibleDots[visibleDots.length - 1]);
+				var nextDot = dots[lastVisibleIndex + 1] || visibleDots[visibleDots.length - 1];
+				var leftOffset = firstDot.offsetLeft + firstDot.offsetWidth / 2;
+				var rightOffset = nextDot.offsetLeft + nextDot.offsetWidth / 2;
+				line.style.left = leftOffset + 'px';
+				line.style.width = Math.max(0, rightOffset - leftOffset) + 'px';
+			}
+
+			Reveal.on('fragmentshown', function() { requestAnimationFrame(updateBacsTimeline); });
+			Reveal.on('fragmenthidden', function() { requestAnimationFrame(updateBacsTimeline); });
+		</script>
+	</body>
+</html>
